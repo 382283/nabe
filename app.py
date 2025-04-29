@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request
 from transformers import pipeline
+import os
+import fitz
 
 app = Flask(__name__)
 
@@ -38,15 +40,30 @@ def index():
     if request.method == "POST":
         file = request.files["file"]
         if file:
-            text = file.read().decode("utf-8")
-            print(f"Uploaded text: {text}")
+            filename = file.filename.lower()
 
-            # テキストが長い場合に分割
-            text_chunks = split_text(text)
+            if filename.endswith(".pdf"):
+                try:
+                    doc = fitz.open(stream=file.read(), filetype="pdf")
+                    text = ""
+                    for page in doc:
+                        text += page.get_text("text")
+                except Exception as e:
+                    print(f"Error reading PDF: {e}")
+                    return "PDF読み込み中にエラーが発生しました。"
+            else:
+                try:
+                    text = file.read().decode("utf-8")
+                except Exception as e:
+                    print(f"Error reading text file: {e}")
+                    return "テキストファイルの読み込み中にエラーが発生しました。"
+            print(f"Uploading text: {text[:500]}...")
 
             # 翻訳を分割して行う
+            text_chunks = split_text(text)
             translated_text = ""
             for chunk in text_chunks:
+
                 try:
                     # チャンクの長さが十分でない場合はスキップ
                     if len(chunk.split()) < 5:  # 例えば、5単語未満なら翻訳しない
